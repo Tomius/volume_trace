@@ -103,7 +103,7 @@ var fsTraceSrc =
 
     vec3 pos = eye + viewDir * tmin;
     float texelDistance = GetTexelDistance(viewDir);
-    float sumContrib = 0.0;
+    float remainingContrib = 1.0;
     vec3 sumColor = vec3(0.0);
     vec3 texCoord = GetTexCoord(pos), lastTexCoord = texCoord;
     float lastDensity = 0.0;
@@ -116,7 +116,7 @@ var fsTraceSrc =
           density = GetDensity(texCoord);
 
           vec3 normal = GetNormal(texCoord, normalLen);
-          sumContrib = 1.0;
+          remainingContrib = 0.0;
           sumColor = GetLighting(normal, normalLen) * (0.8 + 0.2 * normalLen);
           break;
         }
@@ -125,10 +125,12 @@ var fsTraceSrc =
           vec3 normal = GetNormal(texCoord, normalLen);
           normalLen = clamp(normalLen, 0.0, 1.0);
 
-          float contrib = min(density * kDensityModifier, 1.0 - sumContrib) * (0.1 + 0.9 * normalLen);
-          sumContrib += contrib;
-          sumColor += contrib * GetLighting(normal, normalLen);
-          if (sumContrib >= 1.0) {
+          float contrib = min(density * kDensityModifier, remainingContrib) * (0.1 + 0.9 * normalLen);
+          float newContrib = remainingContrib * (1.0-contrib);
+          float diffContrib = remainingContrib - newContrib;
+          remainingContrib = newContrib;
+          sumColor += diffContrib * GetLighting(normal, normalLen);
+          if (remainingContrib < 0.01) {
             break;
           }
         }
@@ -143,7 +145,7 @@ var fsTraceSrc =
       }
     }
 
-    if (sumContrib == 0.0) {
+    if (remainingContrib == 1.0) {
       gl_FragColor = vec4(vec3(0.0), 1.0);
     } else {
       gl_FragColor = vec4(sumColor, 1.0);
